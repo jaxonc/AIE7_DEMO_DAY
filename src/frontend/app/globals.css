@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* Ensure input fields always have proper text colors */
+input, textarea, select {
+  color: #1f2937 !important; /* gray-800 */
+}
+
+/* Dark mode adjustments for form elements */
+@media (prefers-color-scheme: dark) {
+  input, textarea, select {
+    background-color: white !important;
+    color: #1f2937 !important; /* gray-800 */
+  }
+}
+
+.chat-bubble {
+  @apply max-w-xs lg:max-w-md px-4 py-2 rounded-lg;
+}
+
+.user-bubble {
+  @apply bg-blue-500 text-white ml-auto;
+}
+
+.agent-bubble {
+  @apply bg-gray-200 text-gray-800 mr-auto;
+}
+
+/* Loading dots styles removed - replaced with progress tracking */

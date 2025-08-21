@@ -18,7 +18,7 @@ src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, src_path)
 
 try:
-    from utils.graph import get_agent_graph
+    from utils.graph import agent_graph
     from utils.rag_graph import get_rag_graph
     print("✅ Successfully imported agent graph builders")
 except ImportError as e:
@@ -27,12 +27,12 @@ except ImportError as e:
     utils_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'utils'))
     sys.path.insert(0, utils_path)
     try:
-        from graph import get_agent_graph
+        from graph import agent_graph
         from rag_graph import get_rag_graph
         print("✅ Successfully imported agent graph builders (fallback)")
     except ImportError as e2:
         print(f"❌ Fallback import also failed: {e2}")
-        get_agent_graph = lambda: None
+        agent_graph = None
         get_rag_graph = lambda: None
 
 # Initialize FastAPI application with a title
@@ -57,7 +57,7 @@ def initialize_agents():
     global main_agent, rag_agent
     try:
         print("🔄 Initializing agent graphs...")
-        main_agent = get_agent_graph()
+        main_agent = agent_graph
         rag_agent = get_rag_graph()
         
         if main_agent and rag_agent:

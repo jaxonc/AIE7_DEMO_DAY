@@ -5,7 +5,7 @@ from typing import Annotated
 from typing_extensions import TypedDict
 from .model import get_model
 from .upc_validator import UPCValidatorTool, UPCCheckDigitCalculatorTool
-# from .openfoodfacts_tool import OpenFoodFactsTool
+from .openfoodfacts_tool import OpenFoodFactsTool
 from .rag_tool import rag_tool
 from .usda_fdc_tool import USDAFoodDataCentralTool
 from .extraction_tool import UPCExtractionTool
@@ -31,13 +31,12 @@ def build_graph(model_name: str = 'claude-sonnet-4-20250514', display_graph: boo
     upc_extraction_tool = UPCExtractionTool(model=model, debug=debug_extraction)
 
     tool_belt = [
-        upc_extraction_tool,  # Put extraction tool first for priority
-        rag_tool,
-        tavily_tool,
+        upc_extraction_tool,  # Put extraction tool first for priority        
         upc_validator,
         upc_check_digit_calculator,
-        # OpenFoodFactsTool(), # commenting out for RAG implementation
+        OpenFoodFactsTool(), 
         USDAFoodDataCentralTool(),
+        tavily_tool,
     ]
 
     model = model.bind_tools(tool_belt)
@@ -95,19 +94,5 @@ def build_graph(model_name: str = 'claude-sonnet-4-20250514', display_graph: boo
         display(Image(react_graph.get_graph(xray=True).draw_mermaid_png()))
     return react_graph
 
-# Lazy initialization - only build when API keys are available  
-_agent_graph = None
-
-def get_agent_graph():
-    """Get or build the agent graph with lazy initialization"""
-    global _agent_graph
-    if _agent_graph is None:
-        try:
-            _agent_graph = build_graph(model_name="claude-sonnet-4-20250514")
-        except Exception as e:
-            print(f"⚠️ Agent graph initialization deferred: {e}")
-            return None
-    return _agent_graph
-
-# For backward compatibility
-agent_graph = None
+# Initialize the agent graph directly since API keys will be available in .env file
+agent_graph = build_graph(model_name="claude-sonnet-4-20250514")

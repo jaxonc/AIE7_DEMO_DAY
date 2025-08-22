@@ -223,9 +223,11 @@ build/
 # Project-specific directories
 sample_notebooks/
 sample_output/
+.langgraph_api/
 
 # Project-specific files
 collection_metadata.json
+langgraph.json
 
 # macOS system files
 .DS_Store

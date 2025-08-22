@@ -9,30 +9,11 @@ Before you begin, make sure you have:
 - **Node.js 18+** (check with `node --version`)
 - **npm** (usually comes with Node.js, check with `npm --version`)
 
-### Required API Keys
-You'll need API keys from these services:
-
-1. **OpenAI** (for embeddings and some models)
-   - Get yours at: https://platform.openai.com/api-keys
-   - Format: `sk-...`
-
-2. **Anthropic Claude** (primary AI model)
-   - Get yours at: https://console.anthropic.com/settings/keys
-   - Format: `sk-ant-...`
-
-3. **Tavily** (web search)
-   - Get yours at: https://tavily.com/
-   - Format: `tvly-...`
-
-4. **USDA Food Data Central** (nutritional data)
-   - Get yours at: https://api.nal.usda.gov/fdc/v1
-   - Format: alphanumeric key
-
 ## 🎯 Option 1: Quick Start (Automated with uv)
 
 1. **Navigate to the project directory:**
    ```bash
-   cd /path/to/AIE7_Certification_Challenge
+   cd /path/to/AIE7_Demo_Day
    ```
 
 2. **Make the startup script executable:**
@@ -56,14 +37,7 @@ You'll need API keys from these services:
    - Frontend: http://localhost:3000
    - API Docs: http://localhost:8000/docs
 
-5. **Configure API Keys:**
-   - The app will automatically redirect you to the setup page
-   - Enter all required API keys (fresh each time for security)
-   - Click "Proceed to Chat"
-
-> **Security Note:** API keys are never stored permanently and must be re-entered each session. This ensures your credentials are never persisted on disk.
-
-> **Note:** The backend may show warnings about agent graphs until API keys are configured - this is normal!
+5. **Start chatting with the agent!**
 
 ## 🛠️ Option 2: Manual Start with uv
 
@@ -113,21 +87,13 @@ npm run dev
 
 The frontend will start on http://localhost:3000
 
-## 📝 First Time Setup
+## 📝 Getting Started
 
 1. **Open your browser to http://localhost:3000**
 
-2. **You'll see the API Keys Setup page**
+2. **You'll be redirected to the chat interface**
 
-3. **Enter your API keys for all four services:**
-   - OpenAI API Key
-   - Anthropic Claude API Key
-   - Tavily Search API Key
-   - USDA Food Data Central API Key
-
-4. **Click "Proceed to Chat"**
-
-5. **Start chatting with the agent!**
+3. **Start chatting with the agent!**
 
 ## 💬 Example Queries to Try
 
@@ -169,11 +135,6 @@ Once you're in the chat interface, try these:
   npm config set prefix ~/.npm-global
   export PATH=~/.npm-global/bin:$PATH
   ```
-
-### API key errors
-- Double-check that all your API keys are valid
-- Make sure you've copied them completely (no extra spaces)
-- Check that you have credits/quota remaining on each service
 
 ### Backend not responding
 - Check if port 8000 is already in use

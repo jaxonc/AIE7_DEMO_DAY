@@ -1,3 +1,10 @@
+import os
+import sys
+# Import dotenv for environment variable management
+from dotenv import load_dotenv
+# Load environment variables from .env file
+load_dotenv()
+
 # Import required FastAPI components for building the API
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
@@ -7,11 +14,17 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 # Import OpenAI client for interacting with OpenAI's API
 from openai import OpenAI
-import os
-import sys
 import asyncio
 from typing import Optional, List, Dict, Any
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
+
+# Import memory management
+try:
+    from utils.memory import get_memory_manager
+    print("✅ Successfully imported memory management")
+except ImportError as e:
+    print(f"❌ Failed to import memory management: {e}")
+    get_memory_manager = None
 
 # Add the src directory to the path so we can import our agentic system
 src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -19,7 +32,6 @@ sys.path.insert(0, src_path)
 
 try:
     from utils.graph import agent_graph
-    from utils.rag_graph import get_rag_graph
     print("✅ Successfully imported agent graph builders")
 except ImportError as e:
     print(f"❌ Failed to import agent graph builders: {e}")
@@ -28,12 +40,10 @@ except ImportError as e:
     sys.path.insert(0, utils_path)
     try:
         from graph import agent_graph
-        from rag_graph import get_rag_graph
         print("✅ Successfully imported agent graph builders (fallback)")
     except ImportError as e2:
         print(f"❌ Fallback import also failed: {e2}")
         agent_graph = None
-        get_rag_graph = lambda: None
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="S.A.V.E. API")
@@ -48,31 +58,20 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers in requests
 )
 
-# Agent graphs will be built lazily when API keys are configured
+# Initialize agent graphs
 main_agent = None
-rag_agent = None
 
-def initialize_agents():
-    """Initialize agent graphs when API keys are available"""
-    global main_agent, rag_agent
-    try:
-        print("🔄 Initializing agent graphs...")
-        main_agent = agent_graph
-        rag_agent = get_rag_graph()
-        
-        if main_agent and rag_agent:
-            print("✅ All agent graphs initialized successfully")
-            return True
-        else:
-            print("⚠️ Some agent graphs failed to initialize")
-            return False
-    except Exception as e:
-        print(f"❌ Failed to initialize agent graphs: {e}")
-        main_agent = None
-        rag_agent = None
-        return False
-
-print("ℹ️ Agent graphs will be initialized when API keys are configured")
+try:
+    print("🔄 Initializing agent graphs...")
+    main_agent = agent_graph
+    
+    if main_agent:
+        print("✅ All agent graphs initialized successfully")
+    else:
+        print("⚠️ Some agent graphs failed to initialize")
+except Exception as e:
+    print(f"❌ Failed to initialize agent graphs: {e}")
+    main_agent = None
 
 # Define the data model for chat requests using Pydantic
 # This ensures incoming request data is properly validated
@@ -85,27 +84,14 @@ class ChatRequest(BaseModel):
 # Define data model for agent chat requests
 class AgentChatRequest(BaseModel):
     message: str  # User message to send to the agent
-    session_id: Optional[str] = None  # Optional session ID for conversation tracking
-
-# Define data model for RAG requests
-class RAGRequest(BaseModel):
-    question: str  # Question to ask the RAG system
+    session_id: Optional[str] = "default"  # Session ID for conversation tracking, defaults to "default"
 
 # Define response models
 class AgentResponse(BaseModel):
     response: str
     session_id: Optional[str] = None
 
-class RAGResponse(BaseModel):
-    response: str
-    context: List[Dict[str, Any]]  # Context documents used for the response
 
-# Define API keys configuration model
-class ApiKeysRequest(BaseModel):
-    openai_api_key: str
-    anthropic_api_key: str
-    tavily_api_key: str
-    usda_api_key: str
 
 # Define the main chat endpoint that handles POST requests
 @app.post("/api/chat")
@@ -146,20 +132,37 @@ async def agent_chat(request: AgentChatRequest):
     - Extract and validate UPC codes
     - Search product databases (USDA FDC)
     - Perform web searches for food information
-    - Use RAG for product knowledge
+    - Maintain conversation memory for workflow continuity
     """
     if main_agent is None:
         raise HTTPException(status_code=500, detail="Agent system not initialized")
     
+    if get_memory_manager is None:
+        raise HTTPException(status_code=500, detail="Memory management not available")
+    
     try:
+        # Clean up expired sessions
+        memory_manager = get_memory_manager()
+        memory_manager.cleanup_expired_sessions()
+        
         # Create a human message from the user input
         user_message = HumanMessage(content=request.message)
         
-        # Invoke the agent with the message
-        result = main_agent.invoke({"messages": [user_message]})
+        # Get conversation context with memory management
+        conversation_messages = memory_manager.get_conversation_context(
+            request.session_id, 
+            user_message
+        )
+        
+        # Invoke the agent with the full conversation context
+        result = main_agent.invoke({"messages": conversation_messages})
         
         # Extract the response from the agent's output
         agent_response = result["messages"][-1].content if result["messages"] else "No response generated"
+        
+        # Add the agent's response to memory
+        if result["messages"]:
+            memory_manager.add_message(request.session_id, result["messages"][-1])
         
         return AgentResponse(
             response=agent_response,
@@ -169,56 +172,39 @@ async def agent_chat(request: AgentChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
 
-# RAG endpoint for product information queries
-@app.post("/api/rag/query", response_model=RAGResponse)
-async def rag_query(request: RAGRequest):
-    """
-    Query the RAG system for product information using vector search
-    """
-    if rag_agent is None:
-        raise HTTPException(status_code=500, detail="RAG system not initialized")
-    
-    try:
-        # Invoke the RAG agent with the question
-        result = rag_agent.invoke({"question": request.question})
-        
-        # Format context documents for response
-        context_docs = []
-        if "context" in result:
-            for doc in result["context"]:
-                context_docs.append({
-                    "content": doc.page_content,
-                    "metadata": doc.metadata
-                })
-        
-        return RAGResponse(
-            response=result.get("response", "No response generated"),
-            context=context_docs
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"RAG error: {str(e)}")
-
 
 # SSE endpoint for agent chat with progress tracking (GET)
 @app.get("/api/agent/chat/stream-sse")
-async def agent_chat_stream_sse(message: str):
+async def agent_chat_stream_sse(message: str, session_id: str = "default"):
     """
     SSE version of agent chat with real-time progress updates using GET
     """
     if main_agent is None:
         raise HTTPException(status_code=500, detail="Agent system not initialized")
     
+    if get_memory_manager is None:
+        raise HTTPException(status_code=500, detail="Memory management not available")
+    
     async def generate():
         try:
             import json
+            # Clean up expired sessions
+            memory_manager = get_memory_manager()
+            memory_manager.cleanup_expired_sessions()
+            
             # Create a human message from the user input
             user_message = HumanMessage(content=message)
+            
+            # Get conversation context with memory management
+            conversation_messages = memory_manager.get_conversation_context(
+                session_id, 
+                user_message
+            )
             
             final_response_content = None
             
             # Use LangGraph's streaming capability to track actual node execution
-            for event in main_agent.stream({"messages": [user_message]}):
+            for event in main_agent.stream({"messages": conversation_messages}):
                 print(f"Stream event: {event}")  # Debug logging
                 
                 # Handle different types of events from the graph
@@ -253,12 +239,13 @@ async def agent_chat_stream_sse(message: str):
                                     elif 'usda' in tool_name:
                                         progress_msg = json.dumps({"type": "progress", "step": "Searching USDA Food Database...", "node": "tools"})
                                         yield f"data: {progress_msg}\n\n"
+                                    elif 'openfoodfacts' in tool_name:
+                                        progress_msg = json.dumps({"type": "progress", "step": "Searching OpenFoodFacts database...", "node": "tools"})
+                                        yield f"data: {progress_msg}\n\n"
                                     elif 'tavily' in tool_name:
                                         progress_msg = json.dumps({"type": "progress", "step": "Searching the web for food information...", "node": "tools"})
                                         yield f"data: {progress_msg}\n\n"
-                                    elif 'rag' in tool_name:
-                                        progress_msg = json.dumps({"type": "progress", "step": "Searching product knowledge base...", "node": "tools"})
-                                        yield f"data: {progress_msg}\n\n"
+
                     
                     elif node_name == "__end__":
                         progress_msg = json.dumps({"type": "progress", "step": "Preparing final response...", "node": "end"})
@@ -272,6 +259,11 @@ async def agent_chat_stream_sse(message: str):
             
             # Send the final response
             if final_response_content:
+                # Add the agent's response to memory
+                if final_response_content:
+                    ai_message = AIMessage(content=final_response_content)
+                    memory_manager.add_message(session_id, ai_message)
+                
                 final_msg = json.dumps({"type": "response", "content": final_response_content})
                 yield f"data: {final_msg}\n\n"
             else:
@@ -311,67 +303,41 @@ async def get_agent_capabilities():
     """
     Get information about what the agent can do
     """
+    memory_stats = {}
+    if get_memory_manager:
+        memory_manager = get_memory_manager()
+        memory_stats = memory_manager.get_session_stats()
+    
     return {
         "capabilities": [
             "UPC code extraction and validation",
             "USDA Food Data Central integration",
+            "OpenFoodFacts product database search",
             "Web search for food information",
-            "Product knowledge via RAG",
             "Nutritional data lookup",
-            "Product comparison and analysis"
+            "Product comparison and analysis",
+            "Conversation memory for workflow continuity"
         ],
         "tools": [
             "UPC Extraction Tool",
             "UPC Validator Tool", 
             "UPC Check Digit Calculator",
+            "OpenFoodFacts Tool",
             "USDA FDC Tool",
-            "Tavily Search Tool",
-            "RAG Tool"
+            "Tavily Search Tool"
         ],
-        "status": "online" if main_agent is not None else "offline"
+        "status": "online" if main_agent is not None else "offline",
+        "memory": memory_stats
     }
 
-# API Keys configuration endpoint
-@app.post("/api/configure-keys")
-async def configure_api_keys(request: ApiKeysRequest):
-    """
-    Configure API keys for the session and initialize agents
-    """
-    global main_agent, rag_agent
-    try:
-        # Set environment variables for this process
-        os.environ["OPENAI_API_KEY"] = request.openai_api_key
-        os.environ["ANTHROPIC_API_KEY"] = request.anthropic_api_key
-        os.environ["TAVILY_API_KEY"] = request.tavily_api_key
-        os.environ["USDA_API_KEY"] = request.usda_api_key
-        
-        # Initialize agent graphs now that API keys are available
-        success = initialize_agents()
-        
-        return {
-            "status": "success" if success else "partial",
-            "message": "API keys configured and agents initialized" if success else "API keys configured but some agents failed to initialize",
-            "agents_ready": success
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to configure API keys: {str(e)}")
+
 
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
 async def health_check():
-    # Check which API keys are configured
-    keys_status = {
-        "openai": bool(os.environ.get("OPENAI_API_KEY")),
-        "anthropic": bool(os.environ.get("ANTHROPIC_API_KEY")),
-        "tavily": bool(os.environ.get("TAVILY_API_KEY")),
-        "usda": bool(os.environ.get("USDA_API_KEY"))
-    }
-    
     return {
         "status": "ok",
-        "agent_status": "online" if main_agent is not None else "offline",
-        "rag_status": "online" if rag_agent is not None else "offline",
-        "api_keys_configured": keys_status
+        "agent_status": "online" if main_agent is not None else "offline"
     }
 
 # Entry point for running the application directly

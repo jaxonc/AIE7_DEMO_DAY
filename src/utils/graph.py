@@ -1,3 +1,10 @@
+# import os
+# import sys
+# # Import dotenv for environment variable management
+# from dotenv import load_dotenv
+# # Load environment variables from .env file
+# load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+
 from langgraph.graph import END
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
@@ -6,7 +13,6 @@ from typing_extensions import TypedDict
 from .model import get_model
 from .upc_validator import UPCValidatorTool, UPCCheckDigitCalculatorTool
 from .openfoodfacts_tool import OpenFoodFactsTool
-from .rag_tool import rag_tool
 from .usda_fdc_tool import USDAFoodDataCentralTool
 from .extraction_tool import UPCExtractionTool
 from .prompts import get_upc_assistant_prompt

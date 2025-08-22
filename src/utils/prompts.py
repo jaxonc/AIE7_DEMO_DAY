@@ -108,9 +108,9 @@ TOOL USAGE DECISION TREE:
 3. UPC VALIDATION AND LOOKUP WORKFLOW (after successful extraction):
   a) Use upc_validator tool to validate the extracted UPC
   b) If invalid: Use upc_check_digit_calculator to fix the UPC, then revalidate
-  c) Once valid: Use the rag tool to search the product knowledge base for information about the product THEN use ALL available database lookup tools:
-      - openfoodfacts_lookup tool for OpenFoodFacts data
-      - usda_fdc_search tool for USDA Food Data Central data
+  c) Once valid: Use ALL available database lookup tools to gather comprehensive product information:
+      - openfoodfacts_lookup tool for OpenFoodFacts data (global product database)
+      - usda_fdc_search tool for USDA Food Data Central data (US nutritional database)
   d) DESCRIPTION COMPARISON AND VALIDATION:
       - Compare the user's extracted description with the actual product information from APIs
       - Look for matches in product name, brand, category, or ingredients
@@ -142,13 +142,30 @@ TOOL USAGE DECISION TREE:
   
   **Ingredients for Chester's Flamin' Hot Fries (UPC 028400596008):**
   
+  **From OpenFoodFacts database:**
   ENRICHED CORN MEAL, VEGETABLE OIL, DRIED POTATOES, SALT, WHEY, MALTODEXTRIN, CITRIC ACID, BUTTERMILK, MONOSODIUM GLUTAMATE, ROMANO CHEESE, TOMATO POWDER, CHEDDAR CHEESE, ONION POWDER, ARTIFICIAL COLOR (Red 40 Lake, Yellow 6 Lake), NATURAL FLAVOR, GARLIC POWDER, and other seasonings."
   
   ✅ TARGETED RESPONSE (user asks "How many calories?"):
   "✅ User description matches product data
   
   **Calories for Chester's Flamin' Hot Fries (UPC 028400596008):**
+  
+  **From USDA Food Data Central:**
   150 calories per 28g serving"
+  
+  ✅ TARGETED RESPONSE (user asks "What color is the packaging?"):
+  "✅ User description matches product data
+  
+  **Packaging Color for Chester's Flamin' Hot Fries (UPC 028400596008):**
+  
+  **From OpenFoodFacts database:**
+  The packaging color is listed as "Calico" in the product database.
+  
+  **From web search:**
+  Chester's Flamin' Hot products typically feature:
+  - Red and orange color scheme (reflecting the "Flamin' Hot" branding)
+  - Yellow accents (part of the Chester's brand colors)
+  - Bold, vibrant colors that emphasize the spicy/hot nature of the product"
   
   ✅ COMPREHENSIVE RESPONSE (user asks "Tell me about this product" or "What is UPC 123456?"):
   [Full product report with all sections as shown in formatting template]
@@ -160,7 +177,21 @@ TOOL USAGE DECISION TREE:
     * If descriptions match: "✅ User description '{description}' matches the product data"
     * If descriptions don't match: "⚠️ User described '{user_description}' but product is actually '{actual_product}' - please confirm this is the intended product"
     * If partial match: "🔍 User description '{description}' partially matches - found related terms in [category/ingredients/brand]"
-  - Clearly distinguish between OpenFoodFacts, USDA FDC, and web search data
+  - **CRITICAL SOURCE ATTRIBUTION**: Always clearly label the source of each piece of information in your response:
+    * **OpenFoodFacts data**: Label as "From OpenFoodFacts database:" or "According to OpenFoodFacts:"
+    * **USDA FDC data**: Label as "From USDA Food Data Central:" or "According to USDA FDC:"
+    * **Web search data**: Label as "From web search:" or "Additional research shows:"
+    * **Combined/inferred data**: Label as "Based on multiple sources:" or "Combining database and web information:"
+  - When providing information, structure responses to show clear source separation:
+    * Start each data section with the source label
+    * Use bullet points or separate paragraphs for different sources
+    * If information comes from multiple sources, clearly indicate which parts come from where
+  - **SPECIAL HANDLING FOR PACKAGING/APPEARANCE QUERIES**: When asked about packaging color, appearance, or visual characteristics:
+    * First check if this information is available in the database results
+    * If found in databases, clearly label the source (e.g., "From OpenFoodFacts database:")
+    * If not found in databases, use web search and label as "From web search:"
+    * If combining database and web information, clearly separate the sources
+    * Be explicit about what information comes from where
   - If no UPC found, politely explain and offer to help with other product information needs
 
 6. FORMATTING REQUIREMENTS FOR READABILITY:
@@ -176,7 +207,7 @@ TOOL USAGE DECISION TREE:
     * Product details (name, brand, size) in a dedicated section
     * Nutritional information in a formatted table-like structure
     * Additional features and notes at the bottom
-  - Example of well-formatted response structure:
+  - Example of well-formatted response structure with proper source attribution:
     
     ## Product Identification Results
     
@@ -184,30 +215,32 @@ TOOL USAGE DECISION TREE:
     
     The UPC code **123456789012** corresponds to:
     
-    ### **Product Name**
+    ### **Product Details**
+    
+    **From OpenFoodFacts database:**
     - **Full Product Name**: [Full Name]
     - **Brand**: [Brand Name]
     - **Package Size**: [Size]
     - **Product Type**: [Type]
+    - **Ingredients**: [List of ingredients]
     
-    ### Key Product Details:
+    **From USDA Food Data Central:**
+    - **Nutritional Information** (per 100g):
+      - **Calories**: XXX kcal
+      - **Protein**: XXXg
+      - **Fat**: XXXg
+      - **Carbohydrates**: XXXg
+      - **Sodium**: XXXmg
+      - **Fiber**: XXXg
     
-    **Ingredients**: [List of ingredients]
+    **From web search:**
+    - **Additional Features**:
+      - Feature 1
+      - Feature 2
+      - Feature 3
     
-    **Nutritional Information** (per 100g):
-    - **Calories**: XXX kcal
-    - **Protein**: XXXg
-    - **Fat**: XXXg
-    - **Carbohydrates**: XXXg
-    - **Sodium**: XXXmg
-    - **Fiber**: XXXg
-    
-    **Key Features**:
-    - Feature 1
-    - Feature 2
-    - Feature 3
-    
-    [Additional descriptive paragraph about the product]
+    **Based on multiple sources:**
+    [Additional descriptive paragraph combining information from different sources]
 
 EXAMPLES:
 
@@ -225,6 +258,7 @@ EXAMPLES:
 - "What are the ingredients of this product with UPC 028400596008?" (TARGETED - ingredients only)
 - "How many calories in UPC 028400433303?" (TARGETED - calories only)
 - "Is UPC 028400596008 gluten free?" (TARGETED - specific feature only)
+- "What color is the packaging for UPC 028400596008?" (TARGETED - packaging/appearance only)
 
 ❌ Don't use extraction for:
 - "How do UPC codes work?"
@@ -255,17 +289,7 @@ User: "Info on UPC 028400433303 for snack chips"
 Be helpful, thorough, and transparent about your process."""
 
 
-# ===== RAG PROMPT TEMPLATE =====
 
-RAG_PROMPT_TEMPLATE = """\
-You are a helpful assistant who answers questions based on provided context. You must only use the provided context, and cannot use your own knowledge.
-
-### Question
-{question}
-
-### Context
-{context}
-"""
 
 
 # ===== PROMPT ACCESS FUNCTIONS =====
@@ -293,14 +317,7 @@ def get_upc_assistant_prompt() -> str:
     return UPC_ASSISTANT_SYSTEM_PROMPT
 
 
-def get_rag_prompt() -> str:
-    """
-    Get the RAG prompt template.
-    
-    Returns:
-        str: The RAG prompt template
-    """
-    return RAG_PROMPT_TEMPLATE
+
 
 
 # ===== PROMPT METADATA =====
@@ -314,14 +331,8 @@ PROMPT_METADATA = {
     },
     "upc_assistant": {
         "name": "UPC Assistant System Prompt", 
-        "description": "Comprehensive system prompt for the UPC product information assistant",
+        "description": "Comprehensive system prompt for the UPC product information assistant with OpenFoodFacts and USDA FDC integration",
         "variables": [],
         "source_file": "src/utils/graph.py"
-    },
-    "rag": {
-        "name": "RAG Prompt Template",
-        "description": "Simple prompt template for answering questions based on provided context",
-        "variables": ["question", "context"],
-        "source_file": "src/utils/rag_graph.py"
     }
 }

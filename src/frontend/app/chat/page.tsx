@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Send, Bot, User, Loader2, Settings, ArrowLeft, Activity } from 'lucide-react'
+import { Send, Bot, User, Loader2, ArrowLeft, Activity } from 'lucide-react'
 import Image from 'next/image'
 import axios from 'axios'
 
@@ -32,6 +32,7 @@ export default function Chat() {
   const [isLoading, setIsLoading] = useState(false)
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([])
   const [capabilities, setCapabilities] = useState<AgentCapabilities | null>(null)
+  const [sessionId, setSessionId] = useState<string>('default')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
@@ -44,14 +45,6 @@ export default function Chat() {
 
   useEffect(() => {
     const initializeApp = async () => {
-      // Check if API keys are configured for this session only
-      const configured = sessionStorage.getItem('apiKeysConfigured')
-      
-      if (!configured) {
-        router.push('/setup')
-        return
-      }
-
       // Load agent capabilities on component mount
       const loadCapabilities = async () => {
         try {
@@ -102,7 +95,7 @@ export default function Chat() {
       
       // Use EventSource for real-time progress tracking
       const ssePromise = new Promise<void>((resolve, reject) => {
-        const directUrl = `http://localhost:8000/api/agent/chat/stream-sse?message=${encodeURIComponent(inputText)}`
+        const directUrl = `http://localhost:8000/api/agent/chat/stream-sse?message=${encodeURIComponent(inputText)}&session_id=${encodeURIComponent(sessionId)}`
         const eventSource = new EventSource(directUrl)
 
         eventSource.onopen = () => {
@@ -228,11 +221,16 @@ export default function Chat() {
     });
   }
 
-  const handleReconfigure = () => {
-    router.push('/setup')
+  const handleClearSession = () => {
+    setMessages([{
+      id: '1',
+      text: '👋 Hello! I\'m SAVE. I can help you with UPC code validation, nutritional information, product searches, and more. Try asking me about a UPC code or food product!',
+      sender: 'agent',
+      timestamp: new Date()
+    }])
+    // Generate a new session ID to clear memory
+    setSessionId(`session_${Date.now()}`)
   }
-
-  // Removed loading check since we no longer store API keys locally
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -245,23 +243,33 @@ export default function Chat() {
                 <Image src="/save-icon.png" alt="S.A.V.E. Icon" width={64} height={64} className="text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-800">S.A.V.E. (Certification Challenge Prototype)</h1>
+                <h1 className="text-xl font-bold text-gray-800">S.A.V.E. (Demo Day Prototype)</h1>
                 <p className="text-sm text-gray-600">
                   Status: {capabilities?.status === 'online' ? '🟢 Online' : '🔴 Offline'}
                 </p>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <button
-                onClick={handleReconfigure}
-                className="flex items-center space-x-1 text-sm text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100"
-              >
-                <Settings className="h-4 w-4" />
-                <span>API Keys</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs text-gray-500">Session:</span>
+                <input
+                  type="text"
+                  value={sessionId}
+                  onChange={(e) => setSessionId(e.target.value)}
+                  className="text-xs px-2 py-1 border border-gray-300 rounded bg-white text-gray-700 w-24"
+                  placeholder="Session ID"
+                />
+                <button
+                  onClick={handleClearSession}
+                  className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50"
+                  title="Clear session memory"
+                >
+                  Clear
+                </button>
+              </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">AI-Powered Food Assistant</p>
-                <p className="text-xs text-gray-500">UPC • Nutrition • Search</p>
+                <p className="text-xs text-gray-500">UPC • Nutrition • Search • Memory</p>
               </div>
             </div>
           </div>

@@ -57,13 +57,7 @@ fi
 
 echo "✅ Prerequisites check passed"
 
-# Set environment variables (these will be configured via the web interface)
-export OPENAI_API_KEY="${OPENAI_API_KEY:-}"
-export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-}"
-export TAVILY_API_KEY="${TAVILY_API_KEY:-}"
-export USDA_API_KEY="${USDA_API_KEY:-}"
-
-echo "ℹ️  API keys will be configured through the web interface"
+# Environment variables are loaded from .env file by the Python app
 
 # Start backend in background
 echo "📡 Starting FastAPI backend on port 8000..."

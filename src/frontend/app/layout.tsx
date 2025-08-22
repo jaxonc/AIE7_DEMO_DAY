@@ -5,7 +5,7 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'S.A.V.E. (Certification Challenge Prototype)',
+  title: 'S.A.V.E. (Demo Day Prototype)',
   description: 'S.A.V.E. (Simple Autonomous Validation Engine) - AI-powered chatbot with UPC scanning and nutritional information',
   icons: {
     icon: [

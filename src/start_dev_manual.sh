@@ -19,7 +19,6 @@ if [ ! -d ".venv" ]; then
 fi
 
 echo "✅ Using existing virtual environment"
-echo "ℹ️  API keys will be configured through the web interface"
 
 # Start backend in background
 echo "📡 Starting FastAPI backend on port 8000..."

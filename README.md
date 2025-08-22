@@ -1,5 +1,5 @@
 # S.A.V.E. - Simple Autonomous Validation Engine
-### AIE7 Certification Challenge
+### AIE7 Demo Day
 
 **S.A.V.E.** is a comprehensive AI-powered chatbot system designed for food data queries, UPC validation, and nutritional information lookup. This project demonstrates advanced AI agent capabilities, RAG (Retrieval Augmented Generation) systems, and multi-tool integration for intelligent food product analysis.
 
@@ -11,19 +11,20 @@
 
 ## 🎯 Project Overview
 
-S.A.V.E. is a certification challenge prototype that showcases:
+S.A.V.E. is a demo day prototype that showcases:
 
 - **🤖 Intelligent AI Agent**: LangGraph-powered agent with specialized tools
 - **🏷️ UPC Code Processing**: Extract, validate, and lookup product information
 - **🥗 Nutritional Data**: Integration with USDA Food Data Central API
 - **🔍 Advanced Search**: RAG-based product knowledge retrieval
 - **🌐 Web Intelligence**: Tavily-powered web search capabilities
+- **🧠 Conversation Memory**: Session-based memory for workflow continuity
 - **📊 Evaluation Framework**: RAGAS-based evaluation system
 
 ## 🏗️ Architecture
 
 ```
-AIE7_Certification_Challenge/
+AIE7_Demo_Day/
 ├── src/
 │   ├── api/              # FastAPI backend with agent integration
 │   ├── frontend/         # Next.js React frontend
@@ -40,17 +41,12 @@ AIE7_Certification_Challenge/
 
 - **Python 3.13+** and **uv** package manager
 - **Node.js 18+** and **npm**
-- **API Keys** from:
-  - [OpenAI](https://platform.openai.com/api-keys) (embeddings)
-  - [Anthropic](https://console.anthropic.com/settings/keys) (primary LLM)
-  - [Tavily](https://tavily.com/) (web search)
-  - [USDA FDC](https://api.nal.usda.gov/fdc/v1) (nutritional data)
 
 ### Installation & Setup
 
 1. **Clone and navigate to project:**
    ```bash
-   cd AIE7_Certification_Challenge
+   cd AIE7_Demo_Day
    ```
 
 2. **Install uv (if not already installed):**
@@ -69,10 +65,7 @@ AIE7_Certification_Challenge/
    - 📡 **API Backend**: http://localhost:8000
    - 📊 **API Documentation**: http://localhost:8000/docs
 
-5. **Configure API Keys:**
-   - The app will redirect you to setup page on first visit
-   - Enter all required API keys (not stored permanently for security)
-   - Click "Proceed to Chat"
+5. **Start chatting with the agent!**
 
 ## 💬 Usage Examples
 
@@ -81,6 +74,18 @@ AIE7_Certification_Challenge/
 "What are the ingredients for UPC 041548750927?"
 "Validate UPC code 123456789012"
 "Tell me about the nutrition facts for UPC 0-28400-43330-3"
+```
+
+### Conversation Memory Examples
+```
+User: "What's the UPC for Lay's chips?"
+Agent: "I found Lay's Classic Potato Chips with UPC 028400433303..."
+
+User: "What about the ingredients?" (Agent remembers previous product)
+Agent: "The ingredients for Lay's Classic Potato Chips are..."
+
+User: "Is it gluten free?" (Agent maintains context)
+Agent: "Based on the ingredients list, Lay's Classic Potato Chips are gluten-free..."
 ```
 
 ### General Product Queries
@@ -117,6 +122,7 @@ The S.A.V.E. agent integrates multiple specialized tools:
 - **LangGraph Architecture**: Sophisticated agent workflow management
 - **Vector Database**: Qdrant-powered RAG system with 40+ product documents
 - **Streaming Responses**: Real-time chat with progress indicators
+- **Session Memory**: Intelligent conversation memory with automatic optimization
 - **Error Handling**: Graceful fallbacks and user-friendly error messages
 - **Hot Reload**: Development environment with automatic code reloading
 
@@ -181,12 +187,11 @@ jupyter notebook generate_rag_data.ipynb
 ## 📋 API Endpoints
 
 ### Agent Endpoints
-- `POST /api/agent/chat` - Main chat interface
-- `POST /api/agent/chat/stream` - Streaming responses
-- `GET /api/agent/capabilities` - Agent status and tools
+- `POST /api/agent/chat` - Main chat interface with memory
+- `GET /api/agent/chat/stream-sse` - Streaming responses with memory
+- `GET /api/agent/capabilities` - Agent status, tools, and memory stats
 
 ### Utility Endpoints
-- `POST /api/keys` - Configure API keys
 - `GET /api/health` - System health check
 - `POST /api/rag/query` - Direct RAG queries
 
@@ -195,9 +200,8 @@ jupyter notebook generate_rag_data.ipynb
 ### Manual Testing
 1. Start both backend and frontend services
 2. Access http://localhost:3000
-3. Configure API keys through setup interface
-4. Try example queries provided above
-5. Monitor responses and tool usage
+3. Try example queries provided above
+4. Monitor responses and tool usage
 
 ### API Testing
 ```bash
@@ -216,14 +220,13 @@ curl -X POST http://localhost:8000/api/agent/chat \
 ## 🔍 Troubleshooting
 
 ### Common Issues
-- **"Agent not initialized"**: Verify all API keys are configured correctly
+- **"Agent not initialized"**: Check that the backend is running properly
 - **Empty responses**: Check that data files exist in `/data` directory  
 - **Import errors**: Run `uv sync` to ensure dependencies are installed
 - **Frontend connection issues**: Verify backend is running on port 8000
 
 ### Performance Tips
 - Use the automated startup script for best experience
-- API keys are validated on first use - check console for validation errors
 - Large queries may take 10-30 seconds due to multiple tool calls
 
 ## 🔧 Technical Implementation
@@ -254,7 +257,6 @@ curl -X POST http://localhost:8000/api/agent/chat \
 ### API Endpoints Summary
 
 - `POST /api/agent/chat` - Main chat interface with the agent
-- `POST /api/keys` - Configure API keys dynamically
 - `GET /api/agent/capabilities` - Get agent status and available tools
 - `GET /api/health` - System health and connectivity check
 
@@ -266,7 +268,7 @@ For additional documentation:
 
 ## 🤝 Contributing
 
-This is a certification challenge project. Key areas for enhancement:
+This is a demo day project. Key areas for enhancement:
 - Additional data sources and product categories
 - Enhanced evaluation metrics and benchmarks
 - Advanced agent capabilities and tool integration
@@ -275,10 +277,10 @@ This is a certification challenge project. Key areas for enhancement:
 
 ## 📄 License
 
-This project is part of the AIE7 Certification Challenge. Please refer to course materials for licensing and usage guidelines.
+This project is part of the AIE7 Demo Day. Please refer to course materials for licensing and usage guidelines.
 
 ---
 
-**Built with ❤️ for the AIE7 Certification Challenge**
+**Built with ❤️ for the AIE7 Demo Day**
 
 *S.A.V.E. demonstrates advanced AI agent capabilities, RAG systems, and modern web development practices in the food technology domain.*

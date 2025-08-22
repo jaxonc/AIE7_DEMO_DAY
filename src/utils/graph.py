@@ -1,10 +1,4 @@
-# import os
-# import sys
-# # Import dotenv for environment variable management
-# from dotenv import load_dotenv
-# # Load environment variables from .env file
-# load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
-
+import os
 from langgraph.graph import END
 from langchain_core.messages import AnyMessage
 from langgraph.graph.message import add_messages
@@ -24,17 +18,30 @@ from langgraph.prebuilt import ToolNode
 from langgraph.graph import START, StateGraph
 from IPython.display import Image, display
 from langchain_core.messages import SystemMessage
+# Import dotenv for environment variable management
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
-def build_graph(model_name: str = 'claude-sonnet-4-20250514', display_graph: bool = False, debug_extraction: bool = False):
-    # Initialize model first (needed for extraction tool)
+def build_graph(model_name: str = None, display_graph: bool = False, debug_extraction: bool = False):
+    # Use environment variable as default if no model_name provided
+    if model_name is None:
+        model_name = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+    
+    # Initialize main model for the agent (keeps Sonnet 4 for complex reasoning)
     model = get_model(model_name)
+    
+    # Initialize a separate, lighter model specifically for the extraction tool
+    # Using Haiku for cost efficiency since extraction is a simple pattern matching task
+    extraction_model = get_model(os.environ.get("ANTHROPIC_LIGHT_MODEL", "claude-3-haiku-20240307"))
     
     # Initialize tools
     tavily_tool = TavilySearchResults(max_results=5)
     upc_validator = UPCValidatorTool()
     upc_check_digit_calculator = UPCCheckDigitCalculatorTool()
-    upc_extraction_tool = UPCExtractionTool(model=model, debug=debug_extraction)
+    upc_extraction_tool = UPCExtractionTool(model=extraction_model, debug=debug_extraction)
 
     tool_belt = [
         upc_extraction_tool,  # Put extraction tool first for priority        
@@ -101,4 +108,4 @@ def build_graph(model_name: str = 'claude-sonnet-4-20250514', display_graph: boo
     return react_graph
 
 # Initialize the agent graph directly since API keys will be available in .env file
-agent_graph = build_graph(model_name="claude-sonnet-4-20250514")
+agent_graph = build_graph()

@@ -78,7 +78,7 @@ except Exception as e:
 class ChatRequest(BaseModel):
     developer_message: str  # Message from the developer/system
     user_message: str      # Message from the user
-    model: Optional[str] = "gpt-4.1-mini"  # Optional model selection with default
+    model: Optional[str] = None  # Optional model selection with default
     api_key: str          # OpenAI API key for authentication
 
 # Define data model for agent chat requests
@@ -100,11 +100,14 @@ async def chat(request: ChatRequest):
         # Initialize OpenAI client with the provided API key
         client = OpenAI(api_key=request.api_key)
         
+        # Use environment variable as default if no model provided
+        model_to_use = request.model if request.model else os.environ.get("OPENAI_LIGHT_MODEL", "gpt-4.1-mini")
+        
         # Create an async generator function for streaming responses
         async def generate():
             # Create a streaming chat completion request
             stream = client.chat.completions.create(
-                model=request.model,
+                model=model_to_use,
                 messages=[
                     {"role": "developer", "content": request.developer_message},
                     {"role": "user", "content": request.user_message}

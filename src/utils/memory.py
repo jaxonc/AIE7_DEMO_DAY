@@ -5,6 +5,7 @@ This module provides session-based memory management for the S.A.V.E. system,
 enabling workflow continuity while maintaining cost efficiency.
 """
 
+import os
 import time
 import json
 from typing import List, Dict, Optional, Any
@@ -125,7 +126,9 @@ class SAVESession:
     def _estimate_tokens(self) -> int:
         """Estimate token count for current messages"""
         try:
-            encoding = tiktoken.encoding_for_model("gpt-4")
+            # Use cl100k_base encoding which is compatible with Claude models and GPT-4
+            # This is more accurate than using a specific model name for token counting
+            encoding = tiktoken.get_encoding("cl100k_base")
             total_tokens = 0
             
             for message in self.messages:

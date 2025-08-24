@@ -84,12 +84,11 @@ class ChatRequest(BaseModel):
 # Define data model for agent chat requests
 class AgentChatRequest(BaseModel):
     message: str  # User message to send to the agent
-    session_id: Optional[str] = "default"  # Session ID for conversation tracking, defaults to "default"
+    session_id: Optional[str] = None  # Session ID is no longer used, kept for compatibility
 
 # Define response models
 class AgentResponse(BaseModel):
     response: str
-    session_id: Optional[str] = None
 
 
 
@@ -152,10 +151,7 @@ async def agent_chat(request: AgentChatRequest):
         user_message = HumanMessage(content=request.message)
         
         # Get conversation context with memory management (without adding user message yet)
-        conversation_messages = memory_manager.get_conversation_context(
-            request.session_id, 
-            user_message
-        )
+        conversation_messages = memory_manager.get_conversation_context()
         
         # Add the user message to the conversation context for processing
         conversation_messages.append(user_message)
@@ -167,13 +163,12 @@ async def agent_chat(request: AgentChatRequest):
         agent_response = result["messages"][-1].content if result["messages"] else "No response generated"
         
         # Add both user message and agent response to memory after successful processing
-        memory_manager.add_message(request.session_id, user_message)
+        memory_manager.add_message(message=user_message)
         if result["messages"]:
-            memory_manager.add_message(request.session_id, result["messages"][-1])
+            memory_manager.add_message(message=result["messages"][-1])
         
         return AgentResponse(
-            response=agent_response,
-            session_id=request.session_id
+            response=agent_response
         )
         
     except Exception as e:
@@ -182,7 +177,7 @@ async def agent_chat(request: AgentChatRequest):
 
 # SSE endpoint for agent chat with progress tracking (GET)
 @app.get("/api/agent/chat/stream-sse")
-async def agent_chat_stream_sse(message: str, session_id: str = "default"):
+async def agent_chat_stream_sse(message: str):
     """
     SSE version of agent chat with real-time progress updates using GET
     """
@@ -203,10 +198,7 @@ async def agent_chat_stream_sse(message: str, session_id: str = "default"):
             user_message = HumanMessage(content=message)
             
             # Get conversation context with memory management (without adding user message yet)
-            conversation_messages = memory_manager.get_conversation_context(
-                session_id, 
-                user_message
-            )
+            conversation_messages = memory_manager.get_conversation_context()
             
             # Add the user message to the conversation context for processing
             conversation_messages.append(user_message)
@@ -270,10 +262,10 @@ async def agent_chat_stream_sse(message: str, session_id: str = "default"):
             # Send the final response
             if final_response_content:
                 # Add both user message and agent response to memory after successful processing
-                memory_manager.add_message(session_id, user_message)
+                memory_manager.add_message(message=user_message)
                 if final_response_content:
                     ai_message = AIMessage(content=final_response_content)
-                    memory_manager.add_message(session_id, ai_message)
+                    memory_manager.add_message(message=ai_message)
                 
                 final_msg = json.dumps({"type": "response", "content": final_response_content})
                 yield f"data: {final_msg}\n\n"
@@ -341,6 +333,22 @@ async def get_agent_capabilities():
         "memory": memory_stats
     }
 
+
+# Reset session endpoint
+@app.post("/api/agent/reset-session")
+async def reset_session():
+    """
+    Reset the single session, clearing all conversation memory
+    """
+    if get_memory_manager is None:
+        raise HTTPException(status_code=500, detail="Memory management not available")
+    
+    try:
+        memory_manager = get_memory_manager()
+        memory_manager.reset_session()
+        return {"message": "Session reset successfully", "status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to reset session: {str(e)}")
 
 
 # Define a health check endpoint to verify API status

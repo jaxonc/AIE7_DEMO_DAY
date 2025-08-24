@@ -172,25 +172,26 @@ class SAVESession:
 
 
 class SAVEMemoryManager:
-    """Manages multiple S.A.V.E. sessions"""
+    """Manages a single S.A.V.E. session"""
     
     def __init__(self):
-        self.sessions: Dict[str, SAVESession] = {}
+        self.session: Optional[SAVESession] = None
         self.cleanup_interval = 300  # 5 minutes
         self.last_cleanup = time.time()
     
-    def get_session(self, session_id: str) -> SAVESession:
-        """Get or create a session"""
-        if session_id not in self.sessions:
-            self.sessions[session_id] = SAVESession(session_id)
-        return self.sessions[session_id]
+    def get_session(self, session_id: str = "default") -> SAVESession:
+        """Get or create the single session"""
+        if self.session is None:
+            self.session = SAVESession(session_id)
+        return self.session
     
-    def add_message(self, session_id: str, message: BaseMessage):
-        """Add a message to a session"""
+    def add_message(self, session_id: str = "default", message: BaseMessage = None):
+        """Add a message to the session"""
         session = self.get_session(session_id)
-        session.add_message(message)
+        if message:
+            session.add_message(message)
     
-    def get_conversation_context(self, session_id: str, user_message: BaseMessage) -> List[BaseMessage]:
+    def get_conversation_context(self, session_id: str = "default", user_message: BaseMessage = None) -> List[BaseMessage]:
         """Get optimized conversation context for the agent"""
         session = self.get_session(session_id)
         
@@ -198,37 +199,47 @@ class SAVEMemoryManager:
         # The current message will be added after successful processing
         return session.get_optimized_messages()
     
+    def reset_session(self):
+        """Reset the single session, clearing all memory"""
+        if self.session:
+            self.session._clear_session()
+        else:
+            self.session = SAVESession("default")
+    
     def cleanup_expired_sessions(self):
-        """Remove expired sessions to free memory"""
+        """Check if the single session has expired and reset if needed"""
         current_time = time.time()
         
         # Only cleanup every 5 minutes to avoid performance impact
         if current_time - self.last_cleanup < self.cleanup_interval:
             return
         
-        expired_sessions = [
-            session_id for session_id, session in self.sessions.items()
-            if not session.is_active()
-        ]
-        
-        for session_id in expired_sessions:
-            del self.sessions[session_id]
+        if self.session and not self.session.is_active():
+            print("🧹 Session expired, resetting...")
+            self.reset_session()
         
         self.last_cleanup = current_time
-        
-        if expired_sessions:
-            print(f"🧹 Cleaned up {len(expired_sessions)} expired sessions")
     
     def get_session_stats(self) -> Dict[str, Any]:
         """Get memory manager statistics"""
-        active_sessions = sum(1 for session in self.sessions.values() if session.is_active())
-        total_sessions = len(self.sessions)
-        
-        return {
-            "active_sessions": active_sessions,
-            "total_sessions": total_sessions,
-            "expired_sessions": total_sessions - active_sessions
-        }
+        if self.session:
+            return {
+                "active_sessions": 1 if self.session.is_active() else 0,
+                "total_sessions": 1,
+                "expired_sessions": 0 if self.session.is_active() else 1,
+                "session_id": self.session.session_id,
+                "message_count": len(self.session.messages),
+                "last_activity": self.session.last_activity
+            }
+        else:
+            return {
+                "active_sessions": 0,
+                "total_sessions": 0,
+                "expired_sessions": 0,
+                "session_id": None,
+                "message_count": 0,
+                "last_activity": None
+            }
 
 
 # Global memory manager instance

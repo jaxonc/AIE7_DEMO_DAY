@@ -9,6 +9,7 @@ from .upc_validator import UPCValidatorTool, UPCCheckDigitCalculatorTool
 from .openfoodfacts_tool import OpenFoodFactsTool
 from .usda_fdc_tool import USDAFoodDataCentralTool
 from .extraction_tool import UPCExtractionTool
+from .example_database_tool import ExampleDatabaseTool
 from .prompts import get_upc_assistant_prompt, get_upc_assistant_regeneration_prompt, get_validation_node_prompt, get_context_aware_regeneration_prompt
 try:
     from langchain_tavily import TavilySearchResults
@@ -39,12 +40,47 @@ def response_validation_node(state: dict) -> dict:
     if len(state["messages"]) > 30:
         return {"messages": [AIMessage(content="VALIDATION:END")]}
     
-    initial_query = state["messages"][0]
+    # Find the current user query (not the first message in conversation)
+    current_query = None
     final_response = state["messages"][-1]
+    
+    # Look for the most recent human message (user query)
+    for message in reversed(state["messages"][:-1]):  # Exclude the final response
+        if hasattr(message, 'type') and message.type == "human":
+            current_query = message
+            break
+    
+    # If no human message found, use the first message as fallback
+    if current_query is None:
+        current_query = state["messages"][0]
+    
+    print(f"🔍 Validating response for query: {current_query.content[:50]}...")
     
     # Skip validation for non-product queries (off-topic redirections)
     if "Simple Autonomous Verification Engine" in final_response.content and "specialized resources" in final_response.content:
+        print("✅ Skipping validation - off-topic query redirected")
         return {"messages": [AIMessage(content="VALIDATION:PASS")]}
+    
+    # Skip validation for non-product queries (like asking about Batman)
+    current_query_lower = current_query.content.lower()
+    non_product_indicators = [
+        "batman", "superhero", "character", "movie", "actor", "weather", "politics", 
+        "history", "geography", "math", "science", "philosophy", "religion", "sports",
+        "music", "art", "literature", "who is", "what is the weather", "tell me about"
+    ]
+    
+    is_non_product_query = any(indicator in current_query_lower for indicator in non_product_indicators)
+    
+    if is_non_product_query:
+        print("✅ Skipping validation - non-product query detected")
+        return {"messages": [AIMessage(content="VALIDATION:PASS")]}
+    
+    # Skip validation if example database found a product
+    for message in state["messages"]:
+        if hasattr(message, 'content') and message.content:
+            if "Product found in Example Database" in message.content:
+                print("✅ Skipping validation - product found in example database")
+                return {"messages": [AIMessage(content="VALIDATION:PASS")]}
     
     validation_prompt = get_validation_node_prompt()
 
@@ -55,19 +91,24 @@ def response_validation_node(state: dict) -> dict:
     validation_template = PromptTemplate.from_template(validation_prompt)
     validation_chain = validation_template | validation_model | StrOutputParser()
     
+    print(f"🔍 Running validation on response: {len(final_response.content)} chars")
     validation_response = validation_chain.invoke({
-        "initial_query": initial_query.content,
+        "initial_query": current_query.content,
         "final_response": final_response.content,
     })
+    
+    print(f"🔍 Validation response: {validation_response[:100]}...")
     
     # Determine validation result - simplified since specific context is in the message
     validation_lower = validation_response.lower()
     
     if "pass" in validation_lower:
         decision = "PASS"
+        print("✅ Validation PASSED")
         return {"messages": [AIMessage(content="VALIDATION:PASS")]}
     else:
         # Any failure - pass the detailed validation response to the assistant
+        print(f"❌ Validation FAILED: {validation_response}")
         return {"messages": [AIMessage(content=f"VALIDATION:FAIL - {validation_response}")]}
 
 
@@ -97,31 +138,66 @@ def should_continue_after_validation(state: dict) -> str:
 
 
 def build_graph(model_name: str = None, display_graph: bool = False, debug_extraction: bool = False):
-    # Use environment variable as default if no model_name provided
-    if model_name is None:
-        model_name = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+    try:
+        # Use environment variable as default if no model_name provided
+        if model_name is None:
+            model_name = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+        
+        print(f"🤖 Initializing main model: {model_name}")
+        # Initialize main model for the agent (keeps Sonnet 4 for complex reasoning)
+        model = get_model(model_name)
+        
+        # Initialize a separate, lighter model specifically for the extraction tool
+        # Using Haiku for cost efficiency since extraction is a simple pattern matching task
+        extraction_model_name = os.environ.get("ANTHROPIC_LIGHT_MODEL", "claude-3-haiku-20240307")
+        print(f"🤖 Initializing extraction model: {extraction_model_name}")
+        extraction_model = get_model(extraction_model_name)
+        
+        print("✅ Models initialized successfully")
+    except Exception as e:
+        print(f"❌ Failed to initialize models: {e}")
+        raise
     
-    # Initialize main model for the agent (keeps Sonnet 4 for complex reasoning)
-    model = get_model(model_name)
+    # Initialize tools with error handling
+    tool_belt = []
     
-    # Initialize a separate, lighter model specifically for the extraction tool
-    # Using Haiku for cost efficiency since extraction is a simple pattern matching task
-    extraction_model = get_model(os.environ.get("ANTHROPIC_LIGHT_MODEL", "claude-3-haiku-20240307"))
+    # Add extraction tool first (priority)
+    upc_extraction_tool = UPCExtractionTool(model=extraction_model, debug=debug_extraction)
+    tool_belt.append(upc_extraction_tool)
     
-    # Initialize tools
-    tavily_tool = TavilySearchResults(max_results=5)
+    # Add validation tools
     upc_validator = UPCValidatorTool()
     upc_check_digit_calculator = UPCCheckDigitCalculatorTool()
-    upc_extraction_tool = UPCExtractionTool(model=extraction_model, debug=debug_extraction)
-
-    tool_belt = [
-        upc_extraction_tool,  # Put extraction tool first for priority        
-        upc_validator,
-        upc_check_digit_calculator,
-        OpenFoodFactsTool(), 
-        USDAFoodDataCentralTool(),
-        tavily_tool,
-    ]
+    tool_belt.extend([upc_validator, upc_check_digit_calculator])
+    
+    # Add example database tool
+    example_database_tool = ExampleDatabaseTool()
+    tool_belt.append(example_database_tool)
+    
+    # Add database tools with API key checks
+    tool_belt.append(OpenFoodFactsTool())  # No API key required
+    
+    # Check USDA API key
+    usda_api_key = os.environ.get("USDA_API_KEY")
+    if usda_api_key:
+        tool_belt.append(USDAFoodDataCentralTool())
+        print("✅ USDA FDC tool initialized")
+    else:
+        print("⚠️ USDA_API_KEY not found - USDA database functionality disabled")
+    
+    # Add Tavily search tool with API key check
+    try:
+        tavily_api_key = os.environ.get("TAVILY_API_KEY")
+        if tavily_api_key:
+            tavily_tool = TavilySearchResults(max_results=5)
+            tool_belt.append(tavily_tool)
+            print("✅ Tavily search tool initialized")
+        else:
+            print("⚠️ TAVILY_API_KEY not found - web search functionality disabled")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize Tavily tool: {e}")
+    
+    print(f"🔧 Initialized {len(tool_belt)} tools")
 
     model = model.bind_tools(tool_belt)
     
@@ -132,14 +208,60 @@ def build_graph(model_name: str = None, display_graph: bool = False, debug_extra
     def should_continue(state: GraphState):
         messages = state["messages"]
         last_message = messages[-1]
+        
+        # Check if the last message has tool calls
         if last_message.tool_calls:
             return "tools"
+        
+        # Check if the last message is from a tool (tool result)
+        if hasattr(last_message, 'name') and last_message.name:
+            # This is a tool result - check if it's from example database
+            if last_message.name == "example_database_lookup":
+                if "Product found in Example Database" in last_message.content:
+                    print("✅ Example database found product - skipping validation")
+                    return "end"
+        
+        # Check if the last message contains tool results from example database
+        if hasattr(last_message, 'content') and last_message.content:
+            # If example database found a product, skip validation and go to end
+            if "Product found in Example Database" in last_message.content:
+                print("✅ Example database found product - skipping validation")
+                return "end"
+        
         return "response_validation"
 
     # Node for handling all user requests
     def assistant(state: GraphState):
         messages = state["messages"]
         last_message = messages[-1]
+        
+        # Check if this is a fresh query that should ignore previous context
+        # If there's only one message, it's a fresh query
+        if len(messages) == 1:
+            # Fresh query - use only current message
+            system_message = get_upc_assistant_prompt()
+            system_msg = SystemMessage(content=system_message)
+            enhanced_messages = [system_msg, messages[0]]
+            response = model.invoke(enhanced_messages)
+            return {"messages": [response]}
+        
+        # Check if the current message explicitly references previous context
+        current_message_content = messages[-1].content.lower()
+        context_reference_indicators = [
+            "before", "previous", "earlier", "last time", "that upc", "the product", 
+            "what was", "what about", "tell me more about", "for the", "of the",
+            "juice upc i asked about", "product i mentioned", "the one i asked about"
+        ]
+        
+        is_context_reference = any(indicator in current_message_content for indicator in context_reference_indicators)
+        
+        if is_context_reference:
+            # User is explicitly referencing previous context - use full conversation history
+            system_message = get_upc_assistant_prompt()
+            system_msg = SystemMessage(content=system_message)
+            enhanced_messages = [system_msg] + messages
+            response = model.invoke(enhanced_messages)
+            return {"messages": [response]}
         
         # Check if the last message is a validation failure
         if hasattr(last_message, 'content') and "VALIDATION:FAIL" in last_message.content:
@@ -184,7 +306,7 @@ def build_graph(model_name: str = None, display_graph: bool = False, debug_extra
             response = model.invoke(context_messages)
             return {"messages": [response]}
         else:
-            # Normal assistant operation
+            # Normal assistant operation for follow-up queries
             system_message = get_upc_assistant_prompt()
                     
             # Add the system message to the conversation

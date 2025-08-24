@@ -143,6 +143,8 @@ async def agent_chat(request: AgentChatRequest):
         raise HTTPException(status_code=500, detail="Memory management not available")
     
     try:
+        print(f"🔄 Processing agent chat request: {request.message[:50]}...")
+        
         # Clean up expired sessions
         memory_manager = get_memory_manager()
         memory_manager.cleanup_expired_sessions()
@@ -152,15 +154,18 @@ async def agent_chat(request: AgentChatRequest):
         
         # Get conversation context with memory management (without adding user message yet)
         conversation_messages = memory_manager.get_conversation_context()
+        print(f"📝 Conversation context has {len(conversation_messages)} messages")
         
         # Add the user message to the conversation context for processing
         conversation_messages.append(user_message)
         
+        print("🚀 Invoking agent...")
         # Invoke the agent with the full conversation context
         result = main_agent.invoke({"messages": conversation_messages})
         
         # Extract the response from the agent's output
         agent_response = result["messages"][-1].content if result["messages"] else "No response generated"
+        print(f"✅ Agent response generated: {len(agent_response)} chars")
         
         # Add both user message and agent response to memory after successful processing
         memory_manager.add_message(message=user_message)
@@ -172,6 +177,9 @@ async def agent_chat(request: AgentChatRequest):
         )
         
     except Exception as e:
+        print(f"❌ Agent chat error: {e}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Agent error: {str(e)}")
 
 
@@ -190,6 +198,8 @@ async def agent_chat_stream_sse(message: str):
     async def generate():
         try:
             import json
+            print(f"🔄 Starting SSE stream for message: {message[:50]}...")
+            
             # Clean up expired sessions
             memory_manager = get_memory_manager()
             memory_manager.cleanup_expired_sessions()
@@ -199,15 +209,17 @@ async def agent_chat_stream_sse(message: str):
             
             # Get conversation context with memory management (without adding user message yet)
             conversation_messages = memory_manager.get_conversation_context()
+            print(f"📝 Conversation context has {len(conversation_messages)} messages")
             
             # Add the user message to the conversation context for processing
             conversation_messages.append(user_message)
             
             final_response_content = None
             
+            print("🚀 Starting agent stream...")
             # Use LangGraph's streaming capability to track actual node execution
             for event in main_agent.stream({"messages": conversation_messages}):
-                print(f"Stream event: {event}")  # Debug logging
+                print(f"📡 Stream event: {list(event.keys())}")  # Debug logging
                 
                 # Handle different types of events from the graph
                 for node_name, node_data in event.items():
@@ -224,6 +236,7 @@ async def agent_chat_stream_sse(message: str):
                             last_message = node_data["messages"][-1]
                             if hasattr(last_message, 'content'):
                                 final_response_content = last_message.content
+                                print(f"💬 Assistant response captured: {len(final_response_content)} chars")
                     
                     elif node_name == "tools":
                         # Extract actual tool information from the node data
@@ -258,6 +271,9 @@ async def agent_chat_stream_sse(message: str):
                             last_message = node_data["messages"][-1]
                             if hasattr(last_message, 'content'):
                                 final_response_content = last_message.content
+                                print(f"🎯 Final response from end event: {len(final_response_content)} chars")
+            
+            print(f"✅ Stream completed, final response length: {len(final_response_content) if final_response_content else 0}")
             
             # Send the final response
             if final_response_content:
@@ -275,7 +291,7 @@ async def agent_chat_stream_sse(message: str):
                 
         except Exception as e:
             import json
-            print(f"Streaming error: {e}")
+            print(f"❌ Streaming error: {e}")
             import traceback
             traceback.print_exc()
             error_response = json.dumps({"type": "error", "content": f"Error: {str(e)}"})
@@ -314,6 +330,7 @@ async def get_agent_capabilities():
     return {
         "capabilities": [
             "UPC code extraction and validation",
+            "Example database lookup (priority)",
             "USDA Food Data Central integration",
             "OpenFoodFacts product database search",
             "Web search for food information",
@@ -325,6 +342,7 @@ async def get_agent_capabilities():
             "UPC Extraction Tool",
             "UPC Validator Tool", 
             "UPC Check Digit Calculator",
+            "Example Database Tool",
             "OpenFoodFacts Tool",
             "USDA FDC Tool",
             "Tavily Search Tool"

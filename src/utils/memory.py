@@ -136,7 +136,8 @@ class SAVESession:
                     total_tokens += len(encoding.encode(message.content))
             
             return total_tokens
-        except Exception:
+        except Exception as e:
+            print(f"⚠️ Token estimation failed: {e}, using fallback")
             # Fallback estimation: ~4 characters per token
             total_chars = sum(len(str(msg.content)) for msg in self.messages if hasattr(msg, 'content'))
             return total_chars // 4
@@ -187,17 +188,28 @@ class SAVEMemoryManager:
     
     def add_message(self, session_id: str = "default", message: BaseMessage = None):
         """Add a message to the session"""
-        session = self.get_session(session_id)
-        if message:
-            session.add_message(message)
+        try:
+            session = self.get_session(session_id)
+            if message:
+                session.add_message(message)
+                print(f"💾 Memory: Added message to session {session_id}, total messages: {len(session.messages)}")
+        except Exception as e:
+            print(f"❌ Memory error in add_message: {e}")
     
     def get_conversation_context(self, session_id: str = "default", user_message: BaseMessage = None) -> List[BaseMessage]:
         """Get optimized conversation context for the agent"""
-        session = self.get_session(session_id)
-        
-        # Return optimized message history WITHOUT adding the current message yet
-        # The current message will be added after successful processing
-        return session.get_optimized_messages()
+        try:
+            session = self.get_session(session_id)
+            
+            # Return optimized message history WITHOUT adding the current message yet
+            # The current message will be added after successful processing
+            messages = session.get_optimized_messages()
+            print(f"📝 Memory: Retrieved {len(messages)} messages from session {session_id}")
+            return messages
+        except Exception as e:
+            print(f"❌ Memory error in get_conversation_context: {e}")
+            # Return empty list as fallback
+            return []
     
     def reset_session(self):
         """Reset the single session, clearing all memory"""

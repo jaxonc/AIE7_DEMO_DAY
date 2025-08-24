@@ -38,6 +38,9 @@ class OpenFoodFactsTool(BaseTool):
                     "ingredients_text": product.get('ingredients_text', 'N/A'),
                     "nutrition_grades": product.get('nutrition_grades', 'N/A'),
                     "countries": product.get('countries', 'N/A'),
+                    "quantity": product.get('quantity', 'N/A'),  # Package/selling size
+                    "net_quantity": product.get('net_quantity', 'N/A'),  # Alternative package size field
+                    "product_quantity": product.get('product_quantity', 'N/A'),  # Another package size field
                     "url": f"https://world.openfoodfacts.org/product/{upc}"
                 }
                 
@@ -48,6 +51,9 @@ Brands: {result['brands']}
 Categories: {result['categories']}
 Ingredients: {result['ingredients_text']}
 Nutrition Grade: {result['nutrition_grades']}
+Package/Selling Size: {result['quantity']}
+Net Quantity: {result['net_quantity']}
+Product Quantity: {result['product_quantity']}
 Countries: {result['countries']}
 OpenFoodFacts URL: {result['url']}
 

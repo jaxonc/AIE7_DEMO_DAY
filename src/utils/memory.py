@@ -194,10 +194,8 @@ class SAVEMemoryManager:
         """Get optimized conversation context for the agent"""
         session = self.get_session(session_id)
         
-        # Add current message
-        session.add_message(user_message)
-        
-        # Return optimized message history
+        # Return optimized message history WITHOUT adding the current message yet
+        # The current message will be added after successful processing
         return session.get_optimized_messages()
     
     def cleanup_expired_sessions(self):

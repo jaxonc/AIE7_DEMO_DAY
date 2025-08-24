@@ -151,11 +151,14 @@ async def agent_chat(request: AgentChatRequest):
         # Create a human message from the user input
         user_message = HumanMessage(content=request.message)
         
-        # Get conversation context with memory management
+        # Get conversation context with memory management (without adding user message yet)
         conversation_messages = memory_manager.get_conversation_context(
             request.session_id, 
             user_message
         )
+        
+        # Add the user message to the conversation context for processing
+        conversation_messages.append(user_message)
         
         # Invoke the agent with the full conversation context
         result = main_agent.invoke({"messages": conversation_messages})
@@ -163,7 +166,8 @@ async def agent_chat(request: AgentChatRequest):
         # Extract the response from the agent's output
         agent_response = result["messages"][-1].content if result["messages"] else "No response generated"
         
-        # Add the agent's response to memory
+        # Add both user message and agent response to memory after successful processing
+        memory_manager.add_message(request.session_id, user_message)
         if result["messages"]:
             memory_manager.add_message(request.session_id, result["messages"][-1])
         
@@ -198,11 +202,14 @@ async def agent_chat_stream_sse(message: str, session_id: str = "default"):
             # Create a human message from the user input
             user_message = HumanMessage(content=message)
             
-            # Get conversation context with memory management
+            # Get conversation context with memory management (without adding user message yet)
             conversation_messages = memory_manager.get_conversation_context(
                 session_id, 
                 user_message
             )
+            
+            # Add the user message to the conversation context for processing
+            conversation_messages.append(user_message)
             
             final_response_content = None
             
@@ -262,7 +269,8 @@ async def agent_chat_stream_sse(message: str, session_id: str = "default"):
             
             # Send the final response
             if final_response_content:
-                # Add the agent's response to memory
+                # Add both user message and agent response to memory after successful processing
+                memory_manager.add_message(session_id, user_message)
                 if final_response_content:
                     ai_message = AIMessage(content=final_response_content)
                     memory_manager.add_message(session_id, ai_message)

@@ -212,11 +212,11 @@ async def agent_chat_stream_sse(message: str):
                 # Handle different types of events from the graph
                 for node_name, node_data in event.items():
                     if node_name == "__start__":
-                        progress_msg = json.dumps({"type": "progress", "step": "Starting analysis...", "node": "start"})
+                        progress_msg = json.dumps({"type": "progress", "step": "Starting analysis", "node": "start"})
                         yield f"data: {progress_msg}\n\n"
                     
                     elif node_name == "assistant":
-                        progress_msg = json.dumps({"type": "progress", "step": "AI agent analyzing request...", "node": "assistant"})
+                        progress_msg = json.dumps({"type": "progress", "step": "AI agent analyzing request", "node": "assistant"})
                         yield f"data: {progress_msg}\n\n"
                         
                         # Capture the assistant's response for final output
@@ -227,7 +227,7 @@ async def agent_chat_stream_sse(message: str):
                     
                     elif node_name == "tools":
                         # Extract actual tool information from the node data
-                        progress_msg = json.dumps({"type": "progress", "step": "Executing tools...", "node": "tools"})
+                        progress_msg = json.dumps({"type": "progress", "step": "Executing tools", "node": "tools"})
                         yield f"data: {progress_msg}\n\n"
                         
                         # Try to identify which tools were called
@@ -236,21 +236,21 @@ async def agent_chat_stream_sse(message: str):
                                 if hasattr(msg, 'name'):
                                     tool_name = msg.name.lower()
                                     if 'upc' in tool_name:
-                                        progress_msg = json.dumps({"type": "progress", "step": "Extracting and validating UPC codes...", "node": "tools"})
+                                        progress_msg = json.dumps({"type": "progress", "step": "Extracting and validating UPC codes", "node": "tools"})
                                         yield f"data: {progress_msg}\n\n"
                                     elif 'usda' in tool_name:
-                                        progress_msg = json.dumps({"type": "progress", "step": "Searching USDA Food Database...", "node": "tools"})
+                                        progress_msg = json.dumps({"type": "progress", "step": "Searching USDA Food Database", "node": "tools"})
                                         yield f"data: {progress_msg}\n\n"
                                     elif 'openfoodfacts' in tool_name:
-                                        progress_msg = json.dumps({"type": "progress", "step": "Searching OpenFoodFacts database...", "node": "tools"})
+                                        progress_msg = json.dumps({"type": "progress", "step": "Searching OpenFoodFacts database", "node": "tools"})
                                         yield f"data: {progress_msg}\n\n"
                                     elif 'tavily' in tool_name:
-                                        progress_msg = json.dumps({"type": "progress", "step": "Searching the web for food information...", "node": "tools"})
+                                        progress_msg = json.dumps({"type": "progress", "step": "Searching the web for food information", "node": "tools"})
                                         yield f"data: {progress_msg}\n\n"
 
                     
                     elif node_name == "__end__":
-                        progress_msg = json.dumps({"type": "progress", "step": "Preparing final response...", "node": "end"})
+                        progress_msg = json.dumps({"type": "progress", "step": "Preparing final response", "node": "end"})
                         yield f"data: {progress_msg}\n\n"
                         
                         # Get final response from end event if not already captured

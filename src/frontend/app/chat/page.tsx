@@ -315,9 +315,9 @@ export default function Chat() {
               <div className="w-full">
                 <div className="space-y-2">
                   {progressSteps.length > 0 ? (
-                    <div className="space-y-1">
-                      {progressSteps.map((step, index) => {
-                        // Get appropriate icon and color based on step content
+                    <div className="flex items-center space-x-2 text-base">
+                      {(() => {
+                        const currentStep = progressSteps[progressSteps.length - 1];
                         const getStepIcon = (stepText: string) => {
                           if (stepText.includes('Analyzing') || stepText.includes('Starting')) {
                             return <Activity className="h-3 w-3 text-blue-500 animate-pulse" />
@@ -338,12 +338,12 @@ export default function Chat() {
                         }
                         
                         return (
-                          <div key={index} className="flex items-center space-x-2 text-base">
-                            {getStepIcon(step.step)}
-                            <span className="text-gray-700">{step.step}</span>
-                          </div>
+                          <>
+                            {getStepIcon(currentStep.step)}
+                            <span className="text-gray-700">{currentStep.step.replace(/\.\.\.$/, '')}<span className="text-gray-500 animate-pulse">...</span></span>
+                          </>
                         )
-                      })}
+                      })()}
                     </div>
                   ) : (
                     <div className="flex items-center space-x-2 text-base">
